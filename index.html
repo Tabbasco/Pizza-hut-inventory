@@ -1,0 +1,574 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>פיצה האט - ספירת מלאי</title>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/lucide/0.263.1/umd/lucide.js"></script>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', sans-serif;
+        }
+        
+        /* PWA Support */
+        @media (display-mode: standalone) {
+            body {
+                user-select: none;
+                -webkit-user-select: none;
+            }
+        }
+        
+        /* Mobile optimizations */
+        input[type="number"] {
+            -webkit-appearance: none;
+            -moz-appearance: textfield;
+        }
+        
+        input[type="number"]::-webkit-outer-spin-button,
+        input[type="number"]::-webkit-inner-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+    </style>
+    
+    <!-- PWA Meta Tags -->
+    <meta name="theme-color" content="#dc2626">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="default">
+    <meta name="apple-mobile-web-app-title" content="פיצה האט מלאי">
+    
+    <!-- Icon for PWA -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🍕</text></svg>">
+</head>
+<body>
+    <div id="root"></div>
+
+    <script type="text/babel">
+        const { useState, useEffect } = React;
+        const { Users, Plus, Trash2, Save, LogOut, Eye, EyeOff, Package, Edit3 } = lucide;
+
+        const PizzaHutInventory = () => {
+            const [isAdmin, setIsAdmin] = useState(false);
+            const [currentUser, setCurrentUser] = useState(null);
+            const [users, setUsers] = useState(() => {
+                const saved = localStorage.getItem('pizza_hut_users');
+                return saved ? JSON.parse(saved) : [
+                    { id: 1, username: 'admin', password: 'admin123', role: 'admin' }
+                ];
+            });
+            const [loginData, setLoginData] = useState({ username: '', password: '' });
+            const [showPassword, setShowPassword] = useState(false);
+            const [newUser, setNewUser] = useState({ username: '', password: '' });
+            const [showUserForm, setShowUserForm] = useState(false);
+            const [activeTab, setActiveTab] = useState('users');
+
+            const [systemItems, setSystemItems] = useState(() => {
+                const saved = localStorage.getItem('pizza_hut_items');
+                return saved ? JSON.parse(saved) : [];
+            });
+
+            const [newItem, setNewItem] = useState('');
+            const [inventory, setInventory] = useState({});
+
+            useEffect(() => {
+                localStorage.setItem('pizza_hut_users', JSON.stringify(users));
+            }, [users]);
+
+            useEffect(() => {
+                localStorage.setItem('pizza_hut_items', JSON.stringify(systemItems));
+            }, [systemItems]);
+
+            const initializeInventory = (items) => {
+                const inv = {};
+                items.forEach(item => {
+                    inv[item] = '';
+                });
+                return inv;
+            };
+
+            useEffect(() => {
+                if (currentUser && !isAdmin) {
+                    setInventory(initializeInventory(systemItems));
+                }
+            }, [systemItems, currentUser, isAdmin]);
+
+            const login = () => {
+                const user = users.find(u => u.username === loginData.username && u.password === loginData.password);
+                if (user) {
+                    setCurrentUser(user);
+                    setIsAdmin(user.role === 'admin');
+                    setLoginData({ username: '', password: '' });
+                    if (user.role !== 'admin') {
+                        setInventory(initializeInventory(systemItems));
+                    }
+                } else {
+                    alert('שם משתמש או סיסמה שגויים');
+                }
+            };
+
+            const logout = () => {
+                setCurrentUser(null);
+                setIsAdmin(false);
+                setInventory({});
+                setActiveTab('users');
+            };
+
+            const addUser = () => {
+                if (newUser.username && newUser.password) {
+                    const newUserId = Math.max(...users.map(u => u.id), 0) + 1;
+                    setUsers([...users, { 
+                        id: newUserId, 
+                        username: newUser.username, 
+                        password: newUser.password, 
+                        role: 'user' 
+                    }]);
+                    setNewUser({ username: '', password: '' });
+                    setShowUserForm(false);
+                    alert('משתמש נוסף בהצלחה!');
+                }
+            };
+
+            const deleteUser = (userId) => {
+                if (userId === 1) {
+                    alert('לא ניתן למחוק את מנהל המערכת');
+                    return;
+                }
+                setUsers(users.filter(u => u.id !== userId));
+            };
+
+            const addSystemItem = () => {
+                if (newItem.trim() && !systemItems.includes(newItem.trim())) {
+                    setSystemItems([...systemItems, newItem.trim()]);
+                    setNewItem('');
+                    alert('פריט נוסף בהצלחה למערכת!');
+                } else if (systemItems.includes(newItem.trim())) {
+                    alert('הפריט כבר קיים במערכת');
+                }
+            };
+
+            const deleteSystemItem = (item) => {
+                setSystemItems(systemItems.filter(i => i !== item));
+            };
+
+            const updateInventory = (item, quantity) => {
+                setInventory(prev => ({
+                    ...prev,
+                    [item]: quantity
+                }));
+            };
+
+            const canSubmit = () => {
+                return systemItems.every(item => 
+                    inventory[item] !== '' && inventory[item] !== null && inventory[item] !== undefined
+                );
+            };
+
+            const submitInventory = () => {
+                if (canSubmit()) {
+                    const inventoryData = {
+                        user: currentUser.username,
+                        date: new Date().toLocaleString('he-IL'),
+                        items: inventory,
+                        timestamp: new Date().toISOString()
+                    };
+                    
+                    const savedInventories = JSON.parse(localStorage.getItem('pizza_hut_inventories') || '[]');
+                    savedInventories.push(inventoryData);
+                    localStorage.setItem('pizza_hut_inventories', JSON.stringify(savedInventories));
+                    
+                    console.log('נתוני מלאי נשמרו:', inventoryData);
+                    alert('ספירת המלאי נשמרה בהצלחה!');
+                    
+                    setInventory(initializeInventory(systemItems));
+                } else {
+                    alert('יש למלא את כל השדות החובה');
+                }
+            };
+
+            if (!currentUser) {
+                return React.createElement('div', {
+                    className: "min-h-screen bg-gradient-to-br from-red-600 to-red-800 flex items-center justify-center p-4"
+                }, React.createElement('div', {
+                    className: "bg-white rounded-2xl shadow-2xl p-8 w-full max-w-md"
+                }, [
+                    React.createElement('div', {
+                        key: 'header',
+                        className: "text-center mb-8"
+                    }, [
+                        React.createElement('div', {
+                            key: 'icon',
+                            className: "bg-red-100 rounded-full w-20 h-20 flex items-center justify-center mx-auto mb-4"
+                        }, React.createElement('span', {
+                            className: "text-3xl font-bold text-red-600"
+                        }, '🍕')),
+                        React.createElement('h1', {
+                            key: 'title',
+                            className: "text-2xl font-bold text-gray-800 mb-2"
+                        }, 'פיצה האט'),
+                        React.createElement('p', {
+                            key: 'subtitle',
+                            className: "text-gray-600"
+                        }, 'מערכת ספירת מלאי')
+                    ]),
+                    React.createElement('div', {
+                        key: 'form',
+                        className: "space-y-4"
+                    }, [
+                        React.createElement('input', {
+                            key: 'username',
+                            type: "text",
+                            placeholder: "שם משתמש",
+                            value: loginData.username,
+                            onChange: (e) => setLoginData({...loginData, username: e.target.value}),
+                            className: "w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-right"
+                        }),
+                        React.createElement('div', {
+                            key: 'password-container',
+                            className: "relative"
+                        }, [
+                            React.createElement('input', {
+                                key: 'password',
+                                type: showPassword ? "text" : "password",
+                                placeholder: "סיסמה",
+                                value: loginData.password,
+                                onChange: (e) => setLoginData({...loginData, password: e.target.value}),
+                                className: "w-full p-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-red-500 focus:border-transparent text-right pr-12"
+                            }),
+                            React.createElement('button', {
+                                key: 'show-password',
+                                type: "button",
+                                onClick: () => setShowPassword(!showPassword),
+                                className: "absolute left-3 top-1/2 transform -translate-y-1/2 text-gray-500"
+                            }, React.createElement(showPassword ? EyeOff : Eye, { size: 20 }))
+                        ]),
+                        React.createElement('button', {
+                            key: 'login-btn',
+                            onClick: login,
+                            className: "w-full bg-red-600 text-white p-3 rounded-lg hover:bg-red-700 transition-colors font-semibold"
+                        }, 'כניסה למערכת')
+                    ])
+                ]));
+            }
+
+            if (isAdmin) {
+                return React.createElement('div', {
+                    className: "min-h-screen bg-gray-50 p-4"
+                }, React.createElement('div', {
+                    className: "max-w-4xl mx-auto"
+                }, React.createElement('div', {
+                    className: "bg-white rounded-lg shadow-lg p-6"
+                }, [
+                    React.createElement('div', {
+                        key: 'admin-header',
+                        className: "flex justify-between items-center mb-6"
+                    }, [
+                        React.createElement('h1', {
+                            key: 'title',
+                            className: "text-2xl font-bold text-gray-800 flex items-center gap-2"
+                        }, '🍕 ניהול מערכת - פיצה האט'),
+                        React.createElement('button', {
+                            key: 'logout',
+                            onClick: logout,
+                            className: "flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                        }, [React.createElement(LogOut, { key: 'icon', size: 16 }), 'יציאה'])
+                    ]),
+
+                    React.createElement('div', {
+                        key: 'tabs',
+                        className: "flex border-b mb-6"
+                    }, [
+                        React.createElement('button', {
+                            key: 'users-tab',
+                            onClick: () => setActiveTab('users'),
+                            className: `px-6 py-3 font-semibold flex items-center gap-2 ${
+                                activeTab === 'users' 
+                                    ? 'border-b-2 border-red-600 text-red-600' 
+                                    : 'text-gray-600 hover:text-gray-800'
+                            }`
+                        }, [React.createElement(Users, { key: 'icon', size: 16 }), 'ניהול משתמשים']),
+                        React.createElement('button', {
+                            key: 'items-tab',
+                            onClick: () => setActiveTab('items'),
+                            className: `px-6 py-3 font-semibold flex items-center gap-2 ${
+                                activeTab === 'items' 
+                                    ? 'border-b-2 border-red-600 text-red-600' 
+                                    : 'text-gray-600 hover:text-gray-800'
+                            }`
+                        }, [React.createElement(Package, { key: 'icon', size: 16 }), 'ניהול פריטים'])
+                    ]),
+
+                    activeTab === 'users' ? React.createElement('div', { key: 'users-content' }, [
+                        React.createElement('div', {
+                            key: 'add-user-section',
+                            className: "mb-6"
+                        }, [
+                            React.createElement('button', {
+                                key: 'add-user-btn',
+                                onClick: () => setShowUserForm(!showUserForm),
+                                className: "flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg hover:bg-red-700 transition-colors mb-4"
+                            }, [React.createElement(Plus, { key: 'icon', size: 16 }), 'הוסף משתמש חדש']),
+
+                            showUserForm ? React.createElement('div', {
+                                key: 'user-form',
+                                className: "bg-gray-50 p-4 rounded-lg space-y-4"
+                            }, [
+                                React.createElement('input', {
+                                    key: 'new-username',
+                                    type: "text",
+                                    placeholder: "שם משתמש",
+                                    value: newUser.username,
+                                    onChange: (e) => setNewUser({...newUser, username: e.target.value}),
+                                    className: "w-full p-3 border border-gray-300 rounded-lg text-right"
+                                }),
+                                React.createElement('input', {
+                                    key: 'new-password',
+                                    type: "password",
+                                    placeholder: "סיסמה",
+                                    value: newUser.password,
+                                    onChange: (e) => setNewUser({...newUser, password: e.target.value}),
+                                    className: "w-full p-3 border border-gray-300 rounded-lg text-right"
+                                }),
+                                React.createElement('div', {
+                                    key: 'form-buttons',
+                                    className: "flex gap-2"
+                                }, [
+                                    React.createElement('button', {
+                                        key: 'add',
+                                        onClick: addUser,
+                                        className: "bg-green-600 text-white px-4 py-2 rounded-lg hover:bg-green-700"
+                                    }, 'הוסף'),
+                                    React.createElement('button', {
+                                        key: 'cancel',
+                                        onClick: () => setShowUserForm(false),
+                                        className: "bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700"
+                                    }, 'ביטול')
+                                ])
+                            ]) : null
+                        ]),
+
+                        React.createElement('div', {
+                            key: 'users-list',
+                            className: "space-y-3"
+                        }, users.map(user => 
+                            React.createElement('div', {
+                                key: user.id,
+                                className: "flex justify-between items-center p-4 bg-gray-50 rounded-lg"
+                            }, [
+                                React.createElement('div', { key: 'user-info' }, [
+                                    React.createElement('p', {
+                                        key: 'username',
+                                        className: "font-semibold"
+                                    }, user.username),
+                                    React.createElement('p', {
+                                        key: 'role',
+                                        className: "text-sm text-gray-600"
+                                    }, user.role === 'admin' ? 'מנהל' : 'משתמש')
+                                ]),
+                                user.role !== 'admin' ? React.createElement('button', {
+                                    key: 'delete',
+                                    onClick: () => deleteUser(user.id),
+                                    className: "text-red-600 hover:text-red-800 p-2"
+                                }, React.createElement(Trash2, { size: 16 })) : null
+                            ])
+                        ))
+                    ]) : React.createElement('div', { key: 'items-content' }, [
+                        React.createElement('div', {
+                            key: 'add-item-section',
+                            className: "mb-6"
+                        }, React.createElement('div', {
+                            className: "bg-gray-50 p-4 rounded-lg space-y-4 mb-4"
+                        }, [
+                            React.createElement('h3', {
+                                key: 'title',
+                                className: "font-semibold text-gray-700"
+                            }, 'הוסף פריט חדש למערכת'),
+                            React.createElement('div', {
+                                key: 'input-section',
+                                className: "flex gap-2"
+                            }, [
+                                React.createElement('input', {
+                                    key: 'new-item-input',
+                                    type: "text",
+                                    placeholder: "שם הפריט החדש",
+                                    value: newItem,
+                                    onChange: (e) => setNewItem(e.target.value),
+                                    className: "flex-1 p-3 border border-gray-300 rounded-lg text-right"
+                                }),
+                                React.createElement('button', {
+                                    key: 'add-item-btn',
+                                    onClick: addSystemItem,
+                                    className: "bg-green-600 text-white px-6 py-2 rounded-lg hover:bg-green-700"
+                                }, 'הוסף')
+                            ])
+                        ])),
+
+                        React.createElement('div', {
+                            key: 'items-list',
+                            className: "space-y-3"
+                        }, [
+                            React.createElement('h3', {
+                                key: 'items-title',
+                                className: "font-semibold text-gray-700 mb-4"
+                            }, `רשימת פריטים במערכת (${systemItems.length} פריטים)`),
+                            systemItems.length === 0 ? React.createElement('div', {
+                                key: 'empty-state',
+                                className: "text-center p-8 text-gray-500"
+                            }, [
+                                React.createElement(Package, {
+                                    key: 'icon',
+                                    size: 48,
+                                    className: "mx-auto mb-4 text-gray-300"
+                                }),
+                                React.createElement('p', { key: 'text1' }, 'עדיין לא הוספת פריטים למערכת'),
+                                React.createElement('p', {
+                                    key: 'text2',
+                                    className: "text-sm"
+                                }, 'השתמשי בשדה למעלה כדי להוסיף פריטים')
+                            ]) : systemItems.map((item) => 
+                                React.createElement('div', {
+                                    key: item,
+                                    className: "flex justify-between items-center p-4 bg-gray-50 rounded-lg"
+                                }, [
+                                    React.createElement('div', {
+                                        key: 'item-info',
+                                        className: "flex items-center gap-2"
+                                    }, React.createElement('p', {
+                                        className: "font-medium"
+                                    }, item)),
+                                    React.createElement('button', {
+                                        key: 'delete',
+                                        onClick: () => deleteSystemItem(item),
+                                        className: "text-red-600 hover:text-red-800 p-2"
+                                    }, React.createElement(Trash2, { size: 16 }))
+                                ])
+                            )
+                        ]),
+
+                        React.createElement('div', {
+                            key: 'note',
+                            className: "mt-6 p-4 bg-blue-50 rounded-lg"
+                        }, React.createElement('p', {
+                            className: "text-sm text-blue-800"
+                        }, [
+                            React.createElement('strong', { key: 'bold' }, 'הערה: '),
+                            'כל פריט שתוסיפי כאן יופיע אוטומטית לכל המשתמשים בטופס ספירת המלאי כשדה חובה.'
+                        ]))
+                    ])
+                ])));
+            }
+
+            return React.createElement('div', {
+                className: "min-h-screen bg-gray-50 p-4"
+            }, React.createElement('div', {
+                className: "max-w-2xl mx-auto"
+            }, React.createElement('div', {
+                className: "bg-white rounded-lg shadow-lg p-6"
+            }, [
+                React.createElement('div', {
+                    key: 'user-header',
+                    className: "flex justify-between items-center mb-6"
+                }, [
+                    React.createElement('h1', {
+                        key: 'title',
+                        className: "text-2xl font-bold text-gray-800 flex items-center gap-2"
+                    }, '🍕 ספירת מלאי - פיצה האט'),
+                    React.createElement('button', {
+                        key: 'logout',
+                        onClick: logout,
+                        className: "flex items-center gap-2 bg-gray-600 text-white px-4 py-2 rounded-lg hover:bg-gray-700 transition-colors"
+                    }, [React.createElement(LogOut, { key: 'icon', size: 16 }), 'יציאה'])
+                ]),
+
+                React.createElement('div', {
+                    key: 'user-info',
+                    className: "mb-4 p-3 bg-blue-50 rounded-lg"
+                }, React.createElement('p', {
+                    className: "text-sm text-blue-800"
+                }, [
+                    'משתמש: ',
+                    React.createElement('strong', { key: 'username' }, currentUser.username),
+                    ' | תאריך: ',
+                    React.createElement('strong', { key: 'date' }, new Date().toLocaleDateString('he-IL'))
+                ])),
+
+                React.createElement('div', {
+                    key: 'inventory-form',
+                    className: "space-y-4 mb-6"
+                }, [
+                    React.createElement('h2', {
+                        key: 'form-title',
+                        className: "text-lg font-semibold text-gray-700 border-b pb-2"
+                    }, `פריטי מלאי (${systemItems.length} פריטים)`),
+                    systemItems.length === 0 ? React.createElement('div', {
+                        key: 'empty-state',
+                        className: "text-center p-8 text-gray-500"
+                    }, [
+                        React.createElement(Package, {
+                            key: 'icon',
+                            size: 48,
+                            className: "mx-auto mb-4 text-gray-300"
+                        }),
+                        React.createElement('p', { key: 'text1' }, 'אין פריטים במערכת עדיין'),
+                        React.createElement('p', {
+                            key: 'text2',
+                            className: "text-sm"
+                        }, 'המנהל צריך להוסיף פריטים למערכת')
+                    ]) : systemItems.map(item => 
+                        React.createElement('div', {
+                            key: item,
+                            className: "flex items-center gap-3"
+                        }, [
+                            React.createElement('label', {
+                                key: 'label',
+                                className: "flex-1 text-right font-medium text-gray-700"
+                            }, [
+                                item,
+                                ' ',
+                                React.createElement('span', {
+                                    className: "text-red-500"
+                                }, '*')
+                            ]),
+                            React.createElement('input', {
+                                key: 'input',
+                                type: "number",
+                                min: "0",
+                                value: inventory[item] || '',
+                                onChange: (e) => updateInventory(item, e.target.value),
+                                placeholder: "0",
+                                className: "w-24 p-2 border border-gray-300 rounded-lg text-center focus:ring-2 focus:ring-red-500 focus:border-transparent",
+                                required: true
+                            })
+                        ])
+                    )
+                ]),
+
+                React.createElement('div', {
+                    key: 'submit-section',
+                    className: "flex justify-center"
+                }, React.createElement('button', {
+                    onClick: submitInventory,
+                    disabled: !canSubmit(),
+                    className: `flex items-center gap-2 px-8 py-3 rounded-lg font-semibold transition-colors ${
+                        canSubmit()
+                            ? 'bg-green-600 text-white hover:bg-green-700'
+                            : 'bg-gray-300 text-gray-500 cursor-not-allowed'
+                    }`
+                }, [React.createElement(Save, { key: 'icon', size: 16 }), 'שמור ספירת מלאי'])),
+
+                !canSubmit() ? React.createElement('p', {
+                    key: 'validation-msg',
+                    className: "text-center text-red-600 text-sm mt-2"
+                }, 'יש למלא את כל השדות החובה (מסומנים ב-*)') : null
+            ])));
+        };
+
+        ReactDOM.render(React.createElement(PizzaHutInventory), document.getElementById('root'));
+    </script>
+</body>
+</html>
